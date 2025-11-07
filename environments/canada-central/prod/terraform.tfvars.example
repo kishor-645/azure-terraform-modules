@@ -1,0 +1,12 @@
+# Canada Central Production Environment Configuration
+# Copy this file to terraform.tfvars and update values
+
+subscription_id = "00000000-0000-0000-0000-000000000000"
+tenant_id       = "00000000-0000-0000-0000-000000000000"
+
+deployment_stage = "stage1"
+
+kubernetes_version         = "1.28"
+aks_admin_group_object_ids = ["00000000-0000-0000-0000-000000000000"]
+
+jumpbox_ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC..."
