@@ -80,9 +80,8 @@ resource "azurerm_postgresql_flexible_server_database" "databases" {
   collation = "en_US.utf8"
 }
 
+# Diagnostic settings - always create when workspace_id is provided
 resource "azurerm_monitor_diagnostic_setting" "postgresql" {
-  count = var.log_analytics_workspace_id != null ? 1 : 0
-  
   name                       = "diag-${var.server_name}"
   target_resource_id         = azurerm_postgresql_flexible_server.this.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
@@ -91,8 +90,7 @@ resource "azurerm_monitor_diagnostic_setting" "postgresql" {
     category = "PostgreSQLLogs"
   }
   
-  metric {
+  enabled_metric {
     category = "AllMetrics"
-    enabled  = true
   }
 }

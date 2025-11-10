@@ -33,13 +33,14 @@ resource "azurerm_private_dns_zone" "this" {
 # VNet Links (Spoke VNets)
 # ========================================
 
+# Use count instead of for_each to avoid unknown value issues
 resource "azurerm_private_dns_zone_virtual_network_link" "spoke_links" {
-  for_each = toset(var.linked_vnet_ids)
+  count = length(var.linked_vnet_ids)
 
-  name                  = "link-${basename(each.value)}"
+  name                  = "link-${replace(basename(var.linked_vnet_ids[count.index]), "/", "-")}"
   resource_group_name   = var.resource_group_name
   private_dns_zone_name = azurerm_private_dns_zone.this.name
-  virtual_network_id    = each.value
+  virtual_network_id    = var.linked_vnet_ids[count.index]
   registration_enabled  = var.enable_auto_registration
 
   tags = var.tags

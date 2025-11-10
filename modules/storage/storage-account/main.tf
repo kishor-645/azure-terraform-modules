@@ -141,13 +141,11 @@ resource "azurerm_monitor_diagnostic_setting" "storage" {
   target_resource_id         = azurerm_storage_account.this.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
 
-  metric {
+  enabled_metric {
     category = "Transaction"
-    enabled  = true
   }
 
-  metric {
+  enabled_metric {
     category = "Capacity"
-    enabled  = true
   }
 }

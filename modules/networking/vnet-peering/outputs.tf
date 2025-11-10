@@ -14,10 +14,8 @@ output "hub_to_spoke_peering_name" {
   value       = azurerm_virtual_network_peering.hub_to_spoke.name
 }
 
-output "hub_to_spoke_peering_state" {
-  description = "The state of the hub-to-spoke peering connection"
-  value       = azurerm_virtual_network_peering.hub_to_spoke.virtual_network_peering_state
-}
+# Note: virtual_network_peering_state is not available as an output attribute
+# Use Azure Portal or CLI to check peering status
 
 # ========================================
 # Spoke to Hub Peering Outputs
@@ -33,10 +31,8 @@ output "spoke_to_hub_peering_name" {
   value       = azurerm_virtual_network_peering.spoke_to_hub.name
 }
 
-output "spoke_to_hub_peering_state" {
-  description = "The state of the spoke-to-hub peering connection"
-  value       = azurerm_virtual_network_peering.spoke_to_hub.virtual_network_peering_state
-}
+# Note: virtual_network_peering_state is not available as an output attribute
+# Use Azure Portal or CLI to check peering status
 
 # ========================================
 # Consolidated Output
@@ -46,21 +42,21 @@ output "peering_details" {
   description = "Consolidated details of both peering connections"
   value = {
     hub_to_spoke = {
-      id                  = azurerm_virtual_network_peering.hub_to_spoke.id
-      name                = azurerm_virtual_network_peering.hub_to_spoke.name
-      state               = azurerm_virtual_network_peering.hub_to_spoke.virtual_network_peering_state
+      id                    = azurerm_virtual_network_peering.hub_to_spoke.id
+      name                  = azurerm_virtual_network_peering.hub_to_spoke.name
       allow_gateway_transit = azurerm_virtual_network_peering.hub_to_spoke.allow_gateway_transit
     }
     spoke_to_hub = {
       id                  = azurerm_virtual_network_peering.spoke_to_hub.id
       name                = azurerm_virtual_network_peering.spoke_to_hub.name
-      state               = azurerm_virtual_network_peering.spoke_to_hub.virtual_network_peering_state
       use_remote_gateways = azurerm_virtual_network_peering.spoke_to_hub.use_remote_gateways
     }
   }
 }
 
+# Note: Peering state is not available as an attribute
+# Peering is considered successful when both resources are created
 output "peering_status" {
-  description = "Status message indicating whether peering is successful"
-  value       = azurerm_virtual_network_peering.hub_to_spoke.virtual_network_peering_state == "Connected" && azurerm_virtual_network_peering.spoke_to_hub.virtual_network_peering_state == "Connected" ? "Peering established successfully" : "Peering in progress or failed"
+  description = "Status message indicating peering resources are created"
+  value       = "Peering resources created. Check Azure Portal for connection status."
 }

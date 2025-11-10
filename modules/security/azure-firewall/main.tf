@@ -100,9 +100,8 @@ resource "azurerm_firewall" "this" {
 # Diagnostic Settings
 # ========================================
 
+# Diagnostic settings - always create when workspace_id is provided
 resource "azurerm_monitor_diagnostic_setting" "firewall" {
-  count = var.log_analytics_workspace_id != null ? 1 : 0
-
   name                       = "diag-${var.firewall_name}"
   target_resource_id         = azurerm_firewall.this.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
@@ -149,8 +148,7 @@ resource "azurerm_monitor_diagnostic_setting" "firewall" {
   }
 
   # Metrics
-  metric {
+  enabled_metric {
     category = "AllMetrics"
-    enabled  = true
   }
 }

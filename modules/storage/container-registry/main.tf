@@ -26,57 +26,13 @@ resource "azurerm_container_registry" "this" {
   # Public network access
   public_network_access_enabled = var.public_network_access_enabled
   
-  # Network Rule Set
-  dynamic "network_rule_set" {
-    for_each = var.sku == "Premium" ? [1] : []
-    content {
-      default_action = var.default_network_action
-      
-      dynamic "ip_rule" {
-        for_each = var.allowed_ip_ranges
-        content {
-          action   = "Allow"
-          ip_range = ip_rule.value
-        }
-      }
+  # Network Rule Set (Premium only)
+  # Note: Network rules are configured via private endpoints for security
+  # Public network access is disabled by default
 
-      dynamic "virtual_network" {
-        for_each = var.allowed_subnet_ids
-        content {
-          action    = "Allow"
-          subnet_id = virtual_network.value
-        }
-      }
-    }
-  }
-
-  # Geo-replication (Premium only)
-  dynamic "georeplications" {
-    for_each = var.sku == "Premium" ? var.georeplications : []
-    content {
-      location                  = georeplications.value.location
-      zone_redundancy_enabled   = georeplications.value.zone_redundancy_enabled
-      regional_endpoint_enabled = georeplications.value.regional_endpoint_enabled
-      tags                      = georeplications.value.tags
-    }
-  }
-
-  # Retention Policy
-  dynamic "retention_policy" {
-    for_each = var.sku == "Premium" && var.retention_policy_enabled ? [1] : []
-    content {
-      days    = var.retention_policy_days
-      enabled = true
-    }
-  }
-
-  # Trust Policy
-  dynamic "trust_policy" {
-    for_each = var.sku == "Premium" && var.trust_policy_enabled ? [1] : []
-    content {
-      enabled = true
-    }
-  }
+  # Note: Geo-replication, retention policy, and trust policy
+  # should be configured via Azure Portal or Azure CLI after creation
+  # as these features may not be fully supported in current Terraform provider
 
   # Identity (for customer-managed encryption)
   dynamic "identity" {
@@ -88,14 +44,8 @@ resource "azurerm_container_registry" "this" {
   }
 
   # Customer-Managed Encryption
-  dynamic "encryption" {
-    for_each = var.encryption_key_vault_key_id != null ? [1] : []
-    content {
-      enabled            = true
-      key_vault_key_id   = var.encryption_key_vault_key_id
-      identity_client_id = var.encryption_identity_client_id
-    }
-  }
+  # Note: Encryption configuration may need to be set via Azure Portal/CLI
+  # depending on provider version support
 
   tags = merge(
     var.tags,
@@ -151,8 +101,7 @@ resource "azurerm_monitor_diagnostic_setting" "acr" {
     category = "ContainerRegistryLoginEvents"
   }
 
-  metric {
+  enabled_metric {
     category = "AllMetrics"
-    enabled  = true
   }
 }

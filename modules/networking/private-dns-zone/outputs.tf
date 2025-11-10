@@ -29,11 +29,8 @@ output "dns_zone_number_of_record_sets" {
 # ========================================
 
 output "vnet_link_ids" {
-  description = "Map of VNet link IDs"
-  value = {
-    for link in azurerm_private_dns_zone_virtual_network_link.spoke_links :
-    link.name => link.id
-  }
+  description = "List of VNet link IDs"
+  value       = [for link in azurerm_private_dns_zone_virtual_network_link.spoke_links : link.id]
 }
 
 output "vnet_link_names" {

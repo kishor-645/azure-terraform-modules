@@ -1,0 +1,146 @@
+# File: azure-pipelines-pr-validation.yml
+# Purpose: Validate Terraform code on Pull Requests only (no apply)
+
+name: SearatesERP.terraform.PRValidation.$(BuildID)
+
+# We don't want this pipeline to run on normal pushes; 
+# only when a Pull Request is created or updated.
+pr:
+  branches:
+    include:
+      - main
+      - staging
+
+
+stages:
+- stage: PRValidation
+  displayName: 'Pull Request Validation'
+  # Only run if this build is triggered by a pull request
+  condition: eq(variables['Build.Reason'], 'PullRequest')
+
+  jobs:
+  # =========================
+  # Validate changes against "staging"
+  # =========================
+  - job: ValidatePRStage
+    displayName: 'Validate Terraform - Stage'
+    # Only runs if PR target branch is staging
+    condition: eq(variables['System.PullRequest.TargetBranch'], 'refs/heads/staging')
+    pool:
+      vmImage: 'ubuntu-latest'
+
+    variables:
+      - template: variables-stage.yml
+
+    steps:
+      - checkout: self
+
+      - script: |
+            if [ -s "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars" ]; then
+              echo "" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+            fi
+            echo "linux_vm_admin_username = \"$(linux_vm_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+            echo "linux_vm_admin_password = \"$(linux_vm_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+            echo "linux_vm_jumpbox_admin_username = \"$(linux_vm_jumpbox_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+            echo "linux_vm_jumpbox_admin_password = \"$(linux_vm_jumpbox_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+            echo "windows_vm_admin_username = \"$(windows_vm_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+            echo "windows_vm_admin_password = \"$(windows_vm_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+            echo "psql_admin_username = \"$(psql_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+            echo "psql_admin_password = \"$(psql_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+        displayName: 'Append variables to terraform.tfvars'
+
+      - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
+        displayName: 'TF Install'
+        inputs:
+          terraformVersion: 'latest'
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Init'
+        inputs:
+          provider: 'azurerm'
+          command: 'init'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/environments/Staging'
+          backendServiceArm: 'sc-searateserp-stage'
+          backendAzureRmResourceGroupName: 'rg-searates-erp-shared-uaenorth'
+          backendAzureRmStorageAccountName: 'stsearateserptfshared'
+          backendAzureRmContainerName: 'terraform-pr-validation-state-container'
+          backendAzureRmKey: 'pr-stage.tfstate'
+      
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Validate'
+        inputs:
+          provider: 'azurerm'
+          command: 'validate'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/environments/Staging'
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Plan'
+        inputs:
+          provider: 'azurerm'
+          command: 'plan'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/environments/Staging'
+          environmentServiceNameAzureRM: 'sc-searateserp-stage'
+
+  # =========================
+  # Validate changes against "main" (Production)
+  # =========================
+  - job: ValidatePRProd
+    displayName: 'Validate Terraform - Prod'
+    # Only runs if PR target branch is main
+    condition: eq(variables['System.PullRequest.TargetBranch'], 'refs/heads/main')
+    pool:
+      vmImage: 'ubuntu-latest'
+
+    variables:
+      - template: variables-prod.yml
+
+    steps:
+      - checkout: self
+
+      - script: |
+          if [ -s "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars" ]; then
+            echo "" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+          fi
+          echo "linux_vm_admin_username = \"$(linux_vm_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+          echo "linux_vm_admin_password = \"$(linux_vm_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+          echo "linux_vm_jumpbox_admin_username = \"$(linux_vm_jumpbox_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+          echo "linux_vm_jumpbox_admin_password = \"$(linux_vm_jumpbox_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+          echo "windows_vm_admin_username = \"$(windows_vm_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+          echo "windows_vm_admin_password = \"$(windows_vm_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+          echo "psql_admin_username = \"$(psql_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+          echo "psql_admin_password = \"$(psql_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+        displayName: 'Append variables to terraform.tfvars'
+
+      - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
+        displayName: 'TF Install'
+        inputs:
+          terraformVersion: 'latest'
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Init'
+        inputs:
+          provider: 'azurerm'
+          command: 'init'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/environments/production'
+          backendServiceArm: 'sc-searateserp-prod'
+          backendAzureRmResourceGroupName: 'rg-searates-erp-shared-uaenorth'
+          backendAzureRmStorageAccountName: 'stsearateserptfshared'
+          backendAzureRmContainerName: 'terraform-pr-validation-state-container'
+          backendAzureRmKey: 'pr-prod.tfstate'
+      
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Validate'
+        inputs:
+          provider: 'azurerm'
+          command: 'validate'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/environments/production'
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Plan'
+        inputs:
+          provider: 'azurerm'
+          command: 'plan'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/environments/production'
+          environmentServiceNameAzureRM: 'sc-searateserp-prod'

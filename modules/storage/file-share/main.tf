@@ -108,8 +108,7 @@ resource "azurerm_monitor_diagnostic_setting" "file_share" {
     category = "StorageDelete"
   }
 
-  metric {
+  enabled_metric {
     category = "Transaction"
-    enabled  = true
   }
 }

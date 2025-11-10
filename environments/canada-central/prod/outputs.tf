@@ -1,13 +1,8 @@
 # Canada Central Production Environment Outputs
 
-output "resource_group_hub_name" {
-  description = "Hub resource group name"
-  value       = azurerm_resource_group.hub.name
-}
-
-output "resource_group_spoke_name" {
-  description = "Spoke resource group name"
-  value       = azurerm_resource_group.spoke.name
+output "resource_group_name" {
+  description = "Main resource group name"
+  value       = azurerm_resource_group.main.name
 }
 
 output "hub_vnet_id" {
@@ -57,5 +52,5 @@ output "istio_lb_ip_discovery_command" {
 
 output "get_aks_credentials_command" {
   description = "Command to get AKS credentials"
-  value       = "az aks get-credentials --resource-group ${azurerm_resource_group.spoke.name} --name ${module.aks_cluster.cluster_name}"
+  value       = "az aks get-credentials --resource-group ${azurerm_resource_group.main.name} --name ${module.aks_cluster.cluster_name}"
 }

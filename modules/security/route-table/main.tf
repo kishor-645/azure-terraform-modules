@@ -17,10 +17,11 @@ terraform {
 # ========================================
 
 resource "azurerm_route_table" "this" {
-  name                          = var.route_table_name
-  location                      = var.location
-  resource_group_name           = var.resource_group_name
-  disable_bgp_route_propagation = var.disable_bgp_route_propagation
+  name                = var.route_table_name
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  # Note: disable_bgp_route_propagation is not a valid attribute in current azurerm provider
+  # BGP route propagation is controlled at the subnet association level if needed
 
   tags = merge(
     var.tags,

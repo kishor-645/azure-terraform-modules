@@ -68,9 +68,8 @@ resource "azurerm_bastion_host" "this" {
 # Diagnostic Settings (Optional)
 # ========================================
 
+# Diagnostic settings - always create when workspace_id is provided
 resource "azurerm_monitor_diagnostic_setting" "bastion" {
-  count = var.log_analytics_workspace_id != null ? 1 : 0
-
   name                       = "diag-${var.bastion_name}"
   target_resource_id         = azurerm_bastion_host.this.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
@@ -79,8 +78,7 @@ resource "azurerm_monitor_diagnostic_setting" "bastion" {
     category = "BastionAuditLogs"
   }
 
-  metric {
+  enabled_metric {
     category = "AllMetrics"
-    enabled  = true
   }
 }

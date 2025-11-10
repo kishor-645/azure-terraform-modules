@@ -1,0 +1,57 @@
+name: Destroy-Stage-Infra.$(BuildID)
+
+trigger: 
+ - none
+
+stages:
+   - stage: DestroyStage
+     displayName: 'Destroy Stage Environment'
+     jobs:
+      - deployment: DestroyStageDeployment
+        displayName: 'Destroy Stage Infrastructure'
+        pool:
+          vmImage: 'ubuntu-latest'
+        variables:
+        - template: variables-stage.yml
+        environment: 'staging'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - checkout: self
+              - script: |
+                  if [ -s "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars" ]; then
+                    echo "" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                  fi
+                  echo "linux_vm_admin_username = \"$(linux_vm_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                  echo "linux_vm_admin_password = \"$(linux_vm_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                  echo "linux_vm_jumpbox_admin_username = \"$(linux_vm_jumpbox_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                  echo "linux_vm_jumpbox_admin_password = \"$(linux_vm_jumpbox_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                  echo "windows_vm_admin_username = \"$(windows_vm_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                  echo "windows_vm_admin_password = \"$(windows_vm_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                  echo "psql_admin_username = \"$(psql_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                  echo "psql_admin_password = \"$(psql_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                displayName: 'Append variables to terraform.tfvars'
+              - task: 'ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0'
+                displayName: 'Install TF'
+                inputs:
+                  terraformVersion: 'latest'
+              - task: TerraformTaskV4@4
+                displayName: 'tf stage init'
+                inputs:
+                  provider: 'azurerm'
+                  command: 'init'
+                  workingDirectory: '$(System.DefaultWorkingDirectory)/environments/Staging'
+                  backendServiceArm: 'sc-searateserp-stage'
+                  backendAzureRmResourceGroupName: 'rg-searates-erp-shared-uaenorth'
+                  backendAzureRmStorageAccountName: 'stsearateserptfshared'
+                  backendAzureRmContainerName: 'terraform-erp-stage-state-container'
+                  backendAzureRmKey: 'terraform.tfstate'
+              - task: TerraformTaskV4@4
+                displayName: 'tf destroy'
+                inputs:
+                  provider: 'azurerm'
+                  command: 'destroy'
+                  workingDirectory: '$(System.DefaultWorkingDirectory)/environments/Staging'
+                  commandOptions: '-auto-approve'
+                  environmentServiceNameAzureRM: 'sc-searateserp-stage'

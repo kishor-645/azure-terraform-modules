@@ -67,39 +67,5 @@ output "vm_details" {
 
 output "connection_instructions" {
   description = "Instructions for connecting to the VM"
-  value = var.enable_azure_ad_login ? <<-EOT
-    ===================================
-    VM Connection Instructions
-    ===================================
-    
-    1. Connect via Azure Bastion (Recommended):
-       - Navigate to VM in Azure Portal
-       - Click Connect → Bastion
-       - Use Azure AD credentials
-    
-    2. Connect via Native SSH with Azure AD:
-       az ssh vm --resource-group ${var.resource_group_name} \
-                 --name ${var.vm_name}
-    
-    3. Connect via traditional SSH (from jumpbox):
-       ssh ${var.admin_username}@${azurerm_network_interface.this.private_ip_address}
-    
-    VM Name: ${var.vm_name}
-    Private IP: ${azurerm_network_interface.this.private_ip_address}
-    Username: ${var.admin_username}
-    Azure AD Login: Enabled
-    ===================================
-  EOT : <<-EOT
-    ===================================
-    VM Connection Instructions
-    ===================================
-    
-    Connect via SSH:
-    ssh ${var.admin_username}@${azurerm_network_interface.this.private_ip_address}
-    
-    VM Name: ${var.vm_name}
-    Private IP: ${azurerm_network_interface.this.private_ip_address}
-    Username: ${var.admin_username}
-    ===================================
-  EOT
+  value       = var.enable_azure_ad_login ? local.connection_instructions_with_ad : local.connection_instructions_without_ad
 }

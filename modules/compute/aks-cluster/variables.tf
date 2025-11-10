@@ -29,9 +29,17 @@ variable "vnet_id" {
   type        = string
 }
 
-variable "system_node_pool_subnet_id" {
-  description = "Subnet ID for system node pool"
+variable "aks_node_pool_subnet_id" {
+  description = "Subnet ID for shared AKS node pool (used by both system and user node pools)"
   type        = string
+  default     = null
+}
+
+# Legacy variable for backward compatibility
+variable "system_node_pool_subnet_id" {
+  description = "[DEPRECATED] Use aks_node_pool_subnet_id instead. Subnet ID for system node pool"
+  type        = string
+  default     = null
 }
 
 # ========================================
@@ -196,8 +204,9 @@ variable "user_node_pool_vm_size" {
   default     = "Standard_F16s_v2"
 }
 
+# Legacy variable - user node pool now uses same subnet as system pool
 variable "user_node_pool_subnet_id" {
-  description = "Subnet ID for user node pool"
+  description = "[DEPRECATED] User node pool now uses aks_node_pool_subnet_id. This variable is ignored."
   type        = string
   default     = null
 }

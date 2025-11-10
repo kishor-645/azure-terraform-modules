@@ -46,14 +46,11 @@ resource "azurerm_linux_virtual_machine" "this" {
     azurerm_network_interface.this.id
   ]
 
-  # SSH Key Authentication
-  admin_ssh_key {
-    username   = var.admin_username
-    public_key = var.ssh_public_key
-  }
+  # Password Authentication
+  admin_password = var.admin_password
 
-  # Disable password authentication
-  disable_password_authentication = true
+  # Enable password authentication
+  disable_password_authentication = false
 
   # OS Disk
   os_disk {
@@ -142,4 +139,48 @@ resource "azurerm_virtual_machine_extension" "dependency_agent" {
   depends_on = [
     azurerm_virtual_machine_extension.monitor
   ]
+}
+
+# ========================================
+# Local Values for Connection Instructions
+# ========================================
+
+locals {
+  connection_instructions_with_ad = <<-EOT
+    ===================================
+    VM Connection Instructions
+    ===================================
+    
+    1. Connect via Azure Bastion (Recommended):
+       - Navigate to VM in Azure Portal
+       - Click Connect → Bastion
+       - Use Azure AD credentials
+    
+    2. Connect via Native SSH with Azure AD:
+       az ssh vm --resource-group ${var.resource_group_name} \
+                 --name ${var.vm_name}
+    
+    3. Connect via traditional SSH (from jumpbox):
+       ssh ${var.admin_username}@${azurerm_network_interface.this.private_ip_address}
+    
+    VM Name: ${var.vm_name}
+    Private IP: ${azurerm_network_interface.this.private_ip_address}
+    Username: ${var.admin_username}
+    Azure AD Login: Enabled
+    ===================================
+  EOT
+
+  connection_instructions_without_ad = <<-EOT
+    ===================================
+    VM Connection Instructions
+    ===================================
+    
+    Connect via SSH:
+    ssh ${var.admin_username}@${azurerm_network_interface.this.private_ip_address}
+    
+    VM Name: ${var.vm_name}
+    Private IP: ${azurerm_network_interface.this.private_ip_address}
+    Username: ${var.admin_username}
+    ===================================
+  EOT
 }

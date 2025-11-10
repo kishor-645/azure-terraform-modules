@@ -100,9 +100,10 @@ variable "jumpbox_admin_username" {
   default     = "azureuser"
 }
 
-variable "jumpbox_ssh_public_key" {
-  description = "SSH public key for jumpbox access"
+variable "jumpbox_admin_password" {
+  description = "Admin password for jumpbox access"
   type        = string
+  sensitive   = true
 }
 
 variable "log_analytics_retention_days" {
@@ -115,4 +116,60 @@ variable "additional_tags" {
   description = "Additional tags to apply to all resources"
   type        = map(string)
   default     = {}
+}
+
+# PostgreSQL Variables
+variable "postgresql_version" {
+  description = "PostgreSQL version"
+  type        = string
+  default     = "16"
+}
+
+variable "postgresql_admin_login" {
+  description = "PostgreSQL administrator login"
+  type        = string
+  sensitive   = true
+}
+
+variable "postgresql_admin_password" {
+  description = "PostgreSQL administrator password"
+  type        = string
+  sensitive   = true
+}
+
+variable "postgresql_sku_name" {
+  description = "PostgreSQL SKU name"
+  type        = string
+  default     = "GP_Standard_D4s_v3"
+}
+
+variable "postgresql_storage_mb" {
+  description = "PostgreSQL storage in MB"
+  type        = number
+  default     = 131072
+}
+
+variable "postgresql_backup_retention_days" {
+  description = "PostgreSQL backup retention days"
+  type        = number
+  default     = 7
+}
+
+# Agent VM Variables
+variable "agent_vm_size" {
+  description = "Agent VM size"
+  type        = string
+  default     = "Standard_B2s"
+}
+
+variable "agent_vm_admin_username" {
+  description = "Agent VM admin username"
+  type        = string
+  default     = "azureuser"
+}
+
+variable "agent_vm_admin_password" {
+  description = "Admin password for agent VM access"
+  type        = string
+  sensitive   = true
 }

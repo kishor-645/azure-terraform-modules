@@ -1,83 +1,135 @@
 # Canada Central Production Environment - Main Configuration
+# Single Resource Group Architecture
 
-resource "azurerm_resource_group" "hub" {
-  name     = local.rg_hub_name
+# ========================================
+# Resource Group
+# ========================================
+
+resource "azurerm_resource_group" "main" {
+  name     = local.rg_name
   location = local.region
   tags     = local.common_tags
 }
 
-resource "azurerm_resource_group" "spoke" {
-  name     = local.rg_spoke_name
-  location = local.region
-  tags     = local.common_tags
-}
-
-resource "azurerm_resource_group" "aks_nodes" {
-  name     = local.rg_aks_nodes_name
-  location = local.region
-  tags     = local.common_tags
-}
-
-resource "azurerm_resource_group" "global" {
-  name     = local.rg_global_name
-  location = local.region
-  tags     = local.common_tags
-}
+# ========================================
+# Monitoring
+# ========================================
 
 module "log_analytics" {
   source = "../../../modules/monitoring/log-analytics"
   
   workspace_name      = "log-${local.naming_prefix}"
   location            = local.region
-  resource_group_name = azurerm_resource_group.global.name
+  resource_group_name = azurerm_resource_group.main.name
   retention_in_days   = var.log_analytics_retention_days
   
   tags = local.common_tags
 }
+
+# ========================================
+# Networking - Hub VNet
+# ========================================
 
 module "hub_vnet" {
   source = "../../../modules/networking/hub-vnet"
   
   vnet_name           = local.hub_vnet_name
   location            = local.region
-  resource_group_name = azurerm_resource_group.hub.name
+  resource_group_name = azurerm_resource_group.main.name
   address_space       = local.hub_vnet_address_space
+  
+  # Hub VNet Subnet CIDRs
+  firewall_subnet_cidr        = local.hub_firewall_subnet_cidr
+  firewall_mgmt_subnet_cidr  = local.hub_firewall_mgmt_subnet_cidr
+  bastion_subnet_cidr        = local.hub_bastion_subnet_cidr
+  shared_services_subnet_cidr = local.hub_shared_services_subnet_cidr
+  private_endpoints_subnet_cidr = local.hub_private_endpoints_subnet_cidr
+  jumpbox_subnet_cidr        = local.hub_jumpbox_subnet_cidr
   
   tags = local.common_tags
 }
+
+# ========================================
+# Networking - Spoke VNet
+# ========================================
 
 module "spoke_vnet" {
   source = "../../../modules/networking/spoke-vnet"
   
   vnet_name           = local.spoke_vnet_name
   location            = local.region
-  resource_group_name = azurerm_resource_group.spoke.name
-  address_space       = local.spoke_vnet_address_space
+  resource_group_name = azurerm_resource_group.main.name
+  address_space       = local.spoke_vnet_address_space[0]
+  
+  # Single shared subnet for AKS (both system and user node pools)
+  aks_node_pool_subnet_cidr = local.aks_node_pool_subnet_cidr
+  private_endpoints_subnet_cidr = local.private_endpoints_subnet_cidr
+  jumpbox_subnet_cidr = local.jumpbox_subnet_cidr
   
   tags = local.common_tags
 }
+
+# ========================================
+# Networking - VNet Peering
+# ========================================
 
 module "vnet_peering" {
   source = "../../../modules/networking/vnet-peering"
   
   hub_vnet_name           = module.hub_vnet.vnet_name
   hub_vnet_id             = module.hub_vnet.vnet_id
-  hub_resource_group_name = azurerm_resource_group.hub.name
+  hub_resource_group_name = azurerm_resource_group.main.name
   
   spoke_vnet_name           = module.spoke_vnet.vnet_name
   spoke_vnet_id             = module.spoke_vnet.vnet_id
-  spoke_resource_group_name = azurerm_resource_group.spoke.name
+  spoke_resource_group_name = azurerm_resource_group.main.name
   
-  allow_forwarded_traffic = true
-  use_remote_gateways     = false
+  enable_gateway_transit = false
+  use_hub_gateway        = false
 }
+
+# ========================================
+# Private DNS Zones
+# ========================================
+
+locals {
+  private_dns_zones = {
+    acr      = "privatelink.azurecr.io"
+    keyvault = "privatelink.vaultcore.azure.net"
+    blob     = "privatelink.blob.core.windows.net"
+    file     = "privatelink.file.core.windows.net"
+    postgres = "privatelink.postgres.database.azure.com"
+    aks      = "privatelink.${replace(local.region, "-", "")}.azmk8s.io"
+  }
+}
+
+module "private_dns_zones" {
+  source = "../../../modules/networking/private-dns-zone"
+  
+  for_each = local.private_dns_zones
+  
+  dns_zone_name       = each.value
+  resource_group_name = azurerm_resource_group.main.name
+  
+  linked_vnet_ids = [
+    module.spoke_vnet.vnet_id
+  ]
+  
+  tags = merge(local.common_tags, {
+    Service = each.key
+  })
+}
+
+# ========================================
+# Security - Azure Firewall
+# ========================================
 
 module "azure_firewall" {
   source = "../../../modules/security/azure-firewall"
   
   firewall_name               = "azfw-${local.region}-${local.environment}"
   location                    = local.region
-  resource_group_name         = azurerm_resource_group.hub.name
+  resource_group_name         = azurerm_resource_group.main.name
   firewall_policy_name        = "azfwpol-${local.region}-${local.environment}"
   firewall_public_ip_name     = "pip-azfw-${local.region}-${local.environment}"
   firewall_management_ip_name = "pip-azfw-mgmt-${local.region}-${local.environment}"
@@ -93,13 +145,17 @@ module "azure_firewall" {
   threat_intelligence_mode = var.firewall_threat_intel_mode
   idps_mode                = var.firewall_idps_mode
   
-  hub_vnet_cidr   = local.hub_vnet_address_space[0]
+  hub_vnet_cidr   = local.hub_vnet_address_space
   spoke_vnet_cidr = local.spoke_vnet_address_space[0]
   
   log_analytics_workspace_id = module.log_analytics.workspace_id
   
   tags = local.common_tags
 }
+
+# ========================================
+# Security - Route Table for AKS
+# ========================================
 
 module "route_table_aks" {
   source = "../../../modules/security/route-table"
@@ -108,7 +164,7 @@ module "route_table_aks" {
   
   route_table_name              = "rt-aks-${local.region}-${local.environment}"
   location                      = local.region
-  resource_group_name           = azurerm_resource_group.spoke.name
+  resource_group_name           = azurerm_resource_group.main.name
   disable_bgp_route_propagation = true
   
   routes = [
@@ -121,19 +177,26 @@ module "route_table_aks" {
   ]
   
   subnet_ids = [
-    module.spoke_vnet.aks_system_subnet_id,
-    module.spoke_vnet.aks_user_subnet_id
+    module.spoke_vnet.aks_node_pool_subnet_id
+  ]
+  
+  depends_on = [
+    module.azure_firewall
   ]
   
   tags = local.common_tags
 }
+
+# ========================================
+# Security - Azure Bastion
+# ========================================
 
 module "azure_bastion" {
   source = "../../../modules/security/bastion"
   
   bastion_name            = "bastion-${local.region}-${local.environment}"
   location                = local.region
-  resource_group_name     = azurerm_resource_group.hub.name
+  resource_group_name     = azurerm_resource_group.main.name
   bastion_subnet_id       = module.hub_vnet.bastion_subnet_id
   bastion_public_ip_name  = "pip-bastion-${local.region}-${local.environment}"
   
@@ -150,19 +213,115 @@ module "azure_bastion" {
   tags = local.common_tags
 }
 
+# ========================================
+# Storage - Key Vault
+# ========================================
+
+module "key_vault" {
+  source = "../../../modules/storage/key-vault"
+  
+  key_vault_name      = "kv-${local.naming_prefix}"
+  location            = local.region
+  resource_group_name = azurerm_resource_group.main.name
+  
+  sku_name = "premium"
+  
+  enable_private_endpoint = true
+  private_endpoint_subnet_id = module.spoke_vnet.private_endpoints_subnet_id
+  private_dns_zone_ids = [module.private_dns_zones["keyvault"].dns_zone_id]
+  
+  log_analytics_workspace_id = module.log_analytics.workspace_id
+  
+  tags = local.common_tags
+}
+
+# ========================================
+# Storage - Storage Account
+# ========================================
+
+module "storage_account" {
+  source = "../../../modules/storage/storage-account"
+  
+  storage_account_name = replace("st${local.naming_prefix}", "-", "")
+  location             = local.region
+  resource_group_name  = azurerm_resource_group.main.name
+  
+  account_tier             = "Standard"
+  account_replication_type = "ZRS"
+  account_kind             = "StorageV2"
+  
+  enable_private_endpoint = true
+  enable_file_private_endpoint = true
+  private_endpoint_subnet_id = module.spoke_vnet.private_endpoints_subnet_id
+  private_dns_zone_ids_blob = [module.private_dns_zones["blob"].dns_zone_id]
+  private_dns_zone_ids_file = [module.private_dns_zones["file"].dns_zone_id]
+  
+  tags = local.common_tags
+}
+
+# ========================================
+# Storage - Container Registry
+# ========================================
+
+module "container_registry" {
+  source = "../../../modules/storage/container-registry"
+  
+  registry_name      = "acr${replace(local.naming_prefix, "-", "")}"
+  location           = local.region
+  resource_group_name = azurerm_resource_group.main.name
+  
+  sku = "Premium"
+  
+  enable_private_endpoint = true
+  private_endpoint_subnet_id = module.spoke_vnet.private_endpoints_subnet_id
+  private_dns_zone_ids = [module.private_dns_zones["acr"].dns_zone_id]
+  
+  tags = local.common_tags
+}
+
+# ========================================
+# Data - PostgreSQL Flexible Server
+# ========================================
+
+module "postgresql" {
+  source = "../../../modules/data/postgresql-flexible"
+  
+  server_name      = "psql-${local.naming_prefix}"
+  resource_group_name = azurerm_resource_group.main.name
+  location          = local.region
+  
+  postgresql_version    = var.postgresql_version
+  administrator_login   = var.postgresql_admin_login
+  administrator_password = var.postgresql_admin_password
+  
+  sku_name              = var.postgresql_sku_name
+  storage_mb            = var.postgresql_storage_mb
+  backup_retention_days = var.postgresql_backup_retention_days
+  
+  delegated_subnet_id = module.spoke_vnet.private_endpoints_subnet_id
+  private_dns_zone_id = module.private_dns_zones["postgres"].dns_zone_id
+  
+  log_analytics_workspace_id = module.log_analytics.workspace_id
+  
+  tags = local.common_tags
+}
+
+# ========================================
+# Compute - AKS Cluster
+# ========================================
+
 module "aks_cluster" {
   source = "../../../modules/compute/aks-cluster"
   
   cluster_name             = local.aks_cluster_name
   location                 = local.region
-  resource_group_name      = azurerm_resource_group.spoke.name
+  resource_group_name      = azurerm_resource_group.main.name
   dns_prefix               = "${local.aks_cluster_name}-dns"
-  node_resource_group_name = azurerm_resource_group.aks_nodes.name
+  node_resource_group_name = "rg-${local.aks_cluster_name}-nodes"
   kubernetes_version       = var.kubernetes_version
   
-  vnet_id                    = module.spoke_vnet.vnet_id
-  system_node_pool_subnet_id = module.spoke_vnet.aks_system_subnet_id
-  user_node_pool_subnet_id   = module.spoke_vnet.aks_user_subnet_id
+  vnet_id                = module.spoke_vnet.vnet_id
+  aks_node_pool_subnet_id = module.spoke_vnet.aks_node_pool_subnet_id
   
   outbound_type  = local.outbound_type
   service_cidr   = local.service_cidr
@@ -180,10 +339,17 @@ module "aks_cluster" {
   
   aks_identity_name = "id-aks-${local.region}-${local.environment}"
   
+  # ACR access
+  acr_id = module.container_registry.registry_id
+  
+  # Key Vault access
+  key_vault_id = module.key_vault.key_vault_id
+  
   azure_rbac_enabled     = true
   tenant_id              = var.tenant_id
   admin_group_object_ids = var.aks_admin_group_object_ids
   
+  # Istio Service Mesh (inbuilt feature)
   istio_internal_ingress_gateway_enabled = true
   istio_external_ingress_gateway_enabled = false
   
@@ -193,6 +359,62 @@ module "aks_cluster" {
   
   depends_on = [
     module.vnet_peering,
-    module.azure_firewall
+    module.azure_firewall,
+    module.container_registry,
+    module.key_vault
   ]
+}
+
+# ========================================
+# Compute - Jumpbox VM
+# ========================================
+
+module "jumpbox" {
+  source = "../../../modules/compute/linux-vm"
+  
+  vm_name             = "vm-jumpbox-${local.naming_prefix}"
+  location            = local.region
+  resource_group_name = azurerm_resource_group.main.name
+  subnet_id           = module.spoke_vnet.jumpbox_subnet_id
+  
+  nic_name = "nic-jumpbox-${local.naming_prefix}"
+  
+  admin_username   = var.jumpbox_admin_username
+  admin_password   = var.jumpbox_admin_password
+  
+  vm_size  = var.jumpbox_vm_size
+  vm_purpose = "Jumpbox"
+  
+  os_disk_name = "disk-jumpbox-${local.naming_prefix}"
+  
+  tags = merge(local.common_tags, {
+    Purpose = "Jumpbox"
+  })
+}
+
+# ========================================
+# Compute - Agent VM
+# ========================================
+
+module "agent_vm" {
+  source = "../../../modules/compute/linux-vm"
+  
+  vm_name             = "vm-agent-${local.naming_prefix}"
+  location            = local.region
+  resource_group_name = azurerm_resource_group.main.name
+  subnet_id           = module.spoke_vnet.jumpbox_subnet_id
+  
+  nic_name = "nic-agent-${local.naming_prefix}"
+  
+  admin_username   = var.agent_vm_admin_username
+  admin_password   = var.agent_vm_admin_password
+  
+  vm_size  = var.agent_vm_size
+  vm_purpose = "Agent"
+  
+  os_disk_name = "disk-agent-${local.naming_prefix}"
+  
+  tags = merge(local.common_tags, {
+    Purpose = "Agent"
+  })
 }

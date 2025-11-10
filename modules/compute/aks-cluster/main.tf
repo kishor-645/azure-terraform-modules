@@ -1,5 +1,6 @@
-# AKS Cluster Module with Istio Service Mesh
-# Creates private AKS cluster with Azure CNI Overlay and Calico network policy
+# AKS Cluster Module with Single Subnet Configuration
+# Uses 10.1.16.0/22 for BOTH system and user node pools initially
+# Reserve 10.1.0.0/20 for future system pool split
 
 terraform {
   required_version = ">= 1.10.3"
@@ -13,7 +14,16 @@ terraform {
 }
 
 # ========================================
-# AKS Cluster
+# Local Values for Backward Compatibility
+# ========================================
+
+locals {
+  # Use aks_node_pool_subnet_id if provided, otherwise fall back to system_node_pool_subnet_id for backward compatibility
+  node_pool_subnet_id = coalesce(var.aks_node_pool_subnet_id, var.system_node_pool_subnet_id)
+}
+
+# ========================================
+# AKS Cluster with Single Subnet
 # ========================================
 
 resource "azurerm_kubernetes_cluster" "this" {
@@ -31,15 +41,18 @@ resource "azurerm_kubernetes_cluster" "this" {
   # Node Resource Group
   node_resource_group = var.node_resource_group_name
 
-  # Default (System) Node Pool - defined in system-nodepool.tf
+  # Default (System) Node Pool
+  # IMPORTANT: Both system and user pools use shared subnet
+  # Subnet: Shared subnet for both system and user node pools
   default_node_pool {
-    name                = var.system_node_pool_name
-    vm_size             = var.system_node_pool_vm_size
-    vnet_subnet_id      = var.system_node_pool_subnet_id
-    enable_auto_scaling = var.system_node_pool_enable_autoscaling
-    min_count           = var.system_node_pool_enable_autoscaling ? var.system_node_pool_min_count : null
-    max_count           = var.system_node_pool_enable_autoscaling ? var.system_node_pool_max_count : null
-    node_count          = var.system_node_pool_enable_autoscaling ? null : var.system_node_pool_count
+    name           = var.system_node_pool_name
+    vm_size        = var.system_node_pool_vm_size
+    vnet_subnet_id = local.node_pool_subnet_id
+    # Autoscaling is enabled when min_count and max_count are set
+    # If autoscaling is disabled, only node_count is set
+    min_count  = var.system_node_pool_enable_autoscaling ? var.system_node_pool_min_count : null
+    max_count  = var.system_node_pool_enable_autoscaling ? var.system_node_pool_max_count : null
+    node_count = var.system_node_pool_enable_autoscaling ? null : var.system_node_pool_count
     max_pods            = var.system_node_pool_max_pods
     os_disk_size_gb     = var.system_node_pool_os_disk_size_gb
     os_disk_type        = var.system_node_pool_os_disk_type
@@ -53,6 +66,7 @@ resource "azurerm_kubernetes_cluster" "this" {
       var.tags,
       {
         NodePoolType = "System"
+        SubnetShared = "true"  # Indicator that subnet is shared with user pool
       }
     )
   }
@@ -80,17 +94,17 @@ resource "azurerm_kubernetes_cluster" "this" {
 
   # Azure AD Integration with RBAC
   azure_active_directory_role_based_access_control {
-    managed                = true
     azure_rbac_enabled     = var.azure_rbac_enabled
     tenant_id              = var.tenant_id
     admin_group_object_ids = var.admin_group_object_ids
   }
 
-  # Istio Service Mesh Profile
+  # Istio Service Mesh Profile (inbuilt feature)
   service_mesh_profile {
-    mode                             = "Istio"
-    internal_ingress_gateway_enabled = var.istio_internal_ingress_gateway_enabled
-    external_ingress_gateway_enabled = var.istio_external_ingress_gateway_enabled
+    mode = "Istio"
+    # Istio revision - use "default" for the default Istio installation
+    # Internal and external ingress gateways are automatically configured
+    revisions = ["default"]
   }
 
   # Monitoring
@@ -102,17 +116,6 @@ resource "azurerm_kubernetes_cluster" "this" {
   key_vault_secrets_provider {
     secret_rotation_enabled  = var.key_vault_secrets_rotation_enabled
     secret_rotation_interval = var.key_vault_secrets_rotation_interval
-  }
-
-  # Maintenance Window (optional)
-  dynamic "maintenance_window" {
-    for_each = var.maintenance_window_enabled ? [1] : []
-    content {
-      allowed {
-        day   = var.maintenance_window_day
-        hours = var.maintenance_window_hours
-      }
-    }
   }
 
   # Auto-scaler Profile
@@ -132,14 +135,14 @@ resource "azurerm_kubernetes_cluster" "this" {
   tags = merge(
     var.tags,
     {
-      ClusterType = "Private"
-      NetworkMode = "AzureCNIOverlay"
-      ServiceMesh = "Istio"
+      ClusterType  = "Private"
+      NetworkMode  = "AzureCNIOverlay"
+      ServiceMesh  = "Istio"
+      SubnetConfig = "SingleShared"
     }
   )
 
   depends_on = [
-    azurerm_role_assignment.aks_acr_pull,
     azurerm_role_assignment.aks_network_contributor
   ]
 }

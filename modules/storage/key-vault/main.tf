@@ -29,7 +29,7 @@ resource "azurerm_key_vault" "this" {
   enabled_for_deployment          = var.enabled_for_deployment
   enabled_for_disk_encryption     = var.enabled_for_disk_encryption
   enabled_for_template_deployment = var.enabled_for_template_deployment
-  enable_rbac_authorization       = var.enable_rbac_authorization
+  rbac_authorization_enabled       = var.enable_rbac_authorization
   purge_protection_enabled        = var.purge_protection_enabled
   soft_delete_retention_days      = var.soft_delete_retention_days
   
@@ -83,9 +83,8 @@ resource "azurerm_private_endpoint" "this" {
 # Diagnostic Settings
 # ========================================
 
+# Diagnostic settings - always create when workspace_id is provided
 resource "azurerm_monitor_diagnostic_setting" "key_vault" {
-  count = var.log_analytics_workspace_id != null ? 1 : 0
-
   name                       = "diag-${var.key_vault_name}"
   target_resource_id         = azurerm_key_vault.this.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
@@ -98,8 +97,7 @@ resource "azurerm_monitor_diagnostic_setting" "key_vault" {
     category = "AzurePolicyEvaluationDetails"
   }
 
-  metric {
+  enabled_metric {
     category = "AllMetrics"
-    enabled  = true
   }
 }

@@ -1,5 +1,5 @@
 # Spoke VNet Module
-# Creates spoke VNet with 4 subnets for AKS workloads
+# Creates spoke VNet with 3 subnets
 
 terraform {
   required_version = ">= 1.10.3"
@@ -32,15 +32,15 @@ resource "azurerm_virtual_network" "spoke" {
 }
 
 # ========================================
-# Subnets
+# Subnets (3 Total)
 # ========================================
 
-# 1. AKS System Node Pool Subnet
-resource "azurerm_subnet" "aks_system" {
-  name                 = var.aks_system_subnet_name
+# 1. Shared AKS Node Pool Subnet (for both system and user node pools)
+resource "azurerm_subnet" "aks_nodes" {
+  name                 = var.aks_node_pool_subnet_name
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.spoke.name
-  address_prefixes     = [var.aks_system_subnet_cidr]
+  address_prefixes     = [var.aks_node_pool_subnet_cidr]
 
   # Service endpoints for AKS
   service_endpoints = [
@@ -51,23 +51,7 @@ resource "azurerm_subnet" "aks_system" {
   ]
 }
 
-# 2. AKS User Node Pool Subnet
-resource "azurerm_subnet" "aks_user" {
-  name                 = var.aks_user_subnet_name
-  resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.spoke.name
-  address_prefixes     = [var.aks_user_subnet_cidr]
-
-  # Service endpoints for AKS
-  service_endpoints = [
-    "Microsoft.Storage",
-    "Microsoft.Sql",
-    "Microsoft.KeyVault",
-    "Microsoft.ContainerRegistry"
-  ]
-}
-
-# 3. Private Endpoints Subnet (for regional services)
+# 2. Private Endpoints Subnet (for regional services)
 resource "azurerm_subnet" "private_endpoints" {
   name                 = var.private_endpoints_subnet_name
   resource_group_name  = var.resource_group_name
@@ -78,7 +62,7 @@ resource "azurerm_subnet" "private_endpoints" {
   private_endpoint_network_policies = "Disabled"
 }
 
-# 4. Jumpbox/Agent VM Subnet
+# 3. Jumpbox/Agent VM Subnet
 resource "azurerm_subnet" "jumpbox" {
   name                 = var.jumpbox_subnet_name
   resource_group_name  = var.resource_group_name

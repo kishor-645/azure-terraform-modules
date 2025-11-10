@@ -33,23 +33,13 @@ variable "address_space" {
 # Subnet CIDR Variables
 # ========================================
 
-variable "aks_system_subnet_cidr" {
-  description = "CIDR block for AKS system node pool subnet (recommend /20 for 4,091 IPs)"
+variable "aks_node_pool_subnet_cidr" {
+  description = "CIDR block for shared AKS node pool subnet (used by both system and user node pools, recommend /20 for 4,091 IPs)"
   type        = string
 
   validation {
-    condition     = can(cidrhost(var.aks_system_subnet_cidr, 0))
-    error_message = "The aks_system_subnet_cidr must be a valid CIDR block."
-  }
-}
-
-variable "aks_user_subnet_cidr" {
-  description = "CIDR block for AKS user node pool subnet (recommend /22 for 1,019 IPs)"
-  type        = string
-
-  validation {
-    condition     = can(cidrhost(var.aks_user_subnet_cidr, 0))
-    error_message = "The aks_user_subnet_cidr must be a valid CIDR block."
+    condition     = can(cidrhost(var.aks_node_pool_subnet_cidr, 0))
+    error_message = "The aks_node_pool_subnet_cidr must be a valid CIDR block."
   }
 }
 
@@ -77,16 +67,10 @@ variable "jumpbox_subnet_cidr" {
 # Optional Variables
 # ========================================
 
-variable "aks_system_subnet_name" {
-  description = "Name for the AKS system node pool subnet"
+variable "aks_node_pool_subnet_name" {
+  description = "Name for the shared AKS node pool subnet (used by both system and user node pools)"
   type        = string
-  default     = "AKSSystemNodeSubnet"
-}
-
-variable "aks_user_subnet_name" {
-  description = "Name for the AKS user node pool subnet"
-  type        = string
-  default     = "AKSUserNodeSubnet"
+  default     = "AKSNodeSubnet"
 }
 
 variable "private_endpoints_subnet_name" {

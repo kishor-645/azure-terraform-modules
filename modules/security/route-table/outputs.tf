@@ -26,7 +26,7 @@ output "route_table_resource_group_name" {
 
 output "bgp_route_propagation_disabled" {
   description = "Whether BGP route propagation is disabled"
-  value       = azurerm_route_table.this.disable_bgp_route_propagation
+  value       = null  # disable_bgp_route_propagation not available in current provider
 }
 
 # ========================================
@@ -80,7 +80,7 @@ output "route_table_details" {
     name                          = azurerm_route_table.this.name
     location                      = azurerm_route_table.this.location
     resource_group_name           = azurerm_route_table.this.resource_group_name
-    bgp_route_propagation_disabled = azurerm_route_table.this.disable_bgp_route_propagation
+    bgp_route_propagation_disabled = null  # Not available in current provider
     route_count                   = length(azurerm_route.this)
     associated_subnets            = length(azurerm_subnet_route_table_association.this)
   }

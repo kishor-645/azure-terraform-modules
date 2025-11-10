@@ -33,14 +33,20 @@ output "resource_group_name" {
 # Subnet Outputs - IDs
 # ========================================
 
+output "aks_node_pool_subnet_id" {
+  description = "The ID of the shared AKS node pool subnet (used by both system and user node pools)"
+  value       = azurerm_subnet.aks_nodes.id
+}
+
+# Legacy outputs for backward compatibility (deprecated - use aks_node_pool_subnet_id)
 output "aks_system_subnet_id" {
-  description = "The ID of the AKS system node pool subnet"
-  value       = azurerm_subnet.aks_system.id
+  description = "[DEPRECATED] Use aks_node_pool_subnet_id instead. The ID of the shared AKS node pool subnet"
+  value       = azurerm_subnet.aks_nodes.id
 }
 
 output "aks_user_subnet_id" {
-  description = "The ID of the AKS user node pool subnet"
-  value       = azurerm_subnet.aks_user.id
+  description = "[DEPRECATED] Use aks_node_pool_subnet_id instead. The ID of the shared AKS node pool subnet"
+  value       = azurerm_subnet.aks_nodes.id
 }
 
 output "private_endpoints_subnet_id" {
@@ -60,8 +66,7 @@ output "jumpbox_subnet_id" {
 output "subnet_names" {
   description = "Map of subnet names"
   value = {
-    aks_system        = azurerm_subnet.aks_system.name
-    aks_user          = azurerm_subnet.aks_user.name
+    aks_nodes        = azurerm_subnet.aks_nodes.name
     private_endpoints = azurerm_subnet.private_endpoints.name
     jumpbox           = azurerm_subnet.jumpbox.name
   }
@@ -74,8 +79,7 @@ output "subnet_names" {
 output "subnet_address_prefixes" {
   description = "Map of subnet address prefixes"
   value = {
-    aks_system        = azurerm_subnet.aks_system.address_prefixes[0]
-    aks_user          = azurerm_subnet.aks_user.address_prefixes[0]
+    aks_nodes        = azurerm_subnet.aks_nodes.address_prefixes[0]
     private_endpoints = azurerm_subnet.private_endpoints.address_prefixes[0]
     jumpbox           = azurerm_subnet.jumpbox.address_prefixes[0]
   }
@@ -95,15 +99,10 @@ output "spoke_vnet_details" {
       location      = azurerm_virtual_network.spoke.location
     }
     subnets = {
-      aks_system = {
-        id             = azurerm_subnet.aks_system.id
-        name           = azurerm_subnet.aks_system.name
-        address_prefix = azurerm_subnet.aks_system.address_prefixes[0]
-      }
-      aks_user = {
-        id             = azurerm_subnet.aks_user.id
-        name           = azurerm_subnet.aks_user.name
-        address_prefix = azurerm_subnet.aks_user.address_prefixes[0]
+      aks_nodes = {
+        id             = azurerm_subnet.aks_nodes.id
+        name           = azurerm_subnet.aks_nodes.name
+        address_prefix = azurerm_subnet.aks_nodes.address_prefixes[0]
       }
       private_endpoints = {
         id             = azurerm_subnet.private_endpoints.id

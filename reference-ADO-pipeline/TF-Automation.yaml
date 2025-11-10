@@ -1,0 +1,186 @@
+# File: azure-pipelines-deployment.yml
+# Purpose: Only deploy (apply) infrastructure to Stage/Prod based on branch
+
+name: SearatesERP.terraform.Deploy.$(BuildID)
+
+trigger:
+  branches:
+    include:
+      - main
+      - staging
+    # Optionally add other branches if you want them to trigger a deployment.
+
+# We have two stages:
+# 1) StageDeploy: Triggered when code merges to 'staging'
+# 2) ProdDeploy: Triggered when code merges to 'main'
+
+stages:
+
+# -------------------------------------------------------------------------
+# STAGE DEPLOY
+# -------------------------------------------------------------------------
+- stage: StageDeploy
+  displayName: 'Terraform Stage Deploy'
+  # Only run this stage if the source branch is 'develop'
+  condition: eq(variables['Build.SourceBranch'], 'refs/heads/staging')
+
+  jobs:
+    - deployment: TerraformStage
+      displayName: 'Terraform Apply'
+      pool:
+        vmImage: 'ubuntu-latest'
+
+      # We have a stage-specific variable file 
+      # (secret variable come from a Variable Group).
+      variables:
+        - template: variables-stage.yml
+
+      environment: 'staging'  # For Azure DevOps Environment tracking
+
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - checkout: self
+
+              - script: |
+                  if [ -s "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars" ]; then
+                    echo "" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                  fi
+                  echo "linux_vm_admin_username = \"$(linux_vm_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                  echo "linux_vm_admin_password = \"$(linux_vm_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                  echo "linux_vm_jumpbox_admin_username = \"$(linux_vm_jumpbox_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                  echo "linux_vm_jumpbox_admin_password = \"$(linux_vm_jumpbox_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                  echo "windows_vm_admin_username = \"$(windows_vm_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                  echo "windows_vm_admin_password = \"$(windows_vm_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                  echo "psql_admin_username = \"$(psql_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                  echo "psql_admin_password = \"$(psql_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/Staging/terraform.tfvars"
+                displayName: 'Append variables to terraform.tfvars'
+
+              - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
+                displayName: 'Install Terraform'
+                inputs:
+                  # Pin a specific version instead of 'latest' if needed for stability
+                  terraformVersion: 'latest'
+
+              - task: TerraformTaskV4@4
+                displayName: 'Terraform Init'
+                inputs:
+                  provider: 'azurerm'
+                  command: 'init'
+                  workingDirectory: '$(System.DefaultWorkingDirectory)/environments/Staging'
+                  backendServiceArm: 'sc-searateserp-stage'
+                  backendAzureRmResourceGroupName: 'rg-searates-erp-shared-uaenorth'
+                  backendAzureRmStorageAccountName: 'stsearateserptfshared'
+                  backendAzureRmContainerName: 'terraform-erp-stage-state-container'
+                  backendAzureRmKey: 'terraform.tfstate'
+              
+
+              - task: TerraformTaskV4@4
+                displayName: 'Terraform Validate'
+                inputs:
+                  provider: 'azurerm'
+                  command: 'validate'
+                  workingDirectory: '$(System.DefaultWorkingDirectory)/environments/Staging'
+
+              - task: TerraformTaskV4@4
+                displayName: 'Terraform Plan'
+                inputs:
+                  provider: 'azurerm'
+                  command: 'plan'
+                  workingDirectory: '$(System.DefaultWorkingDirectory)/environments/Staging'
+                  commandOptions: '-out=tfplan'
+                  environmentServiceNameAzureRM: 'sc-searateserp-stage'
+
+              - task: TerraformTaskV4@4
+                displayName: 'Terraform Apply'
+                inputs:
+                  provider: 'azurerm'
+                  command: 'apply'
+                  workingDirectory: '$(System.DefaultWorkingDirectory)/environments/Staging'
+                  commandOptions: '-auto-approve tfplan'
+                  environmentServiceNameAzureRM: 'sc-searateserp-stage'
+
+
+# -------------------------------------------------------------------------
+# PROD DEPLOY
+# -------------------------------------------------------------------------
+- stage: ProdDeploy
+  displayName: 'Terraform Production Deploy'
+  # Only run this stage if the source branch is 'main'
+  condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+
+  jobs:
+    - deployment: TerraformProd
+      displayName: 'Terraform Apply'
+      pool:
+        vmImage: 'ubuntu-latest'
+
+      # We have a prod-specific variable file 
+      # (secret variables come from a Variable Group).
+      variables:
+        - template: variables-prod.yml
+
+      environment: 'production'  # For Azure DevOps Environment tracking
+
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - checkout: self
+
+              - script: |
+                  if [ -s "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars" ]; then
+                    echo "" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+                  fi
+                  echo "linux_vm_admin_username = \"$(linux_vm_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+                  echo "linux_vm_admin_password = \"$(linux_vm_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+                  echo "linux_vm_jumpbox_admin_username = \"$(linux_vm_jumpbox_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+                  echo "linux_vm_jumpbox_admin_password = \"$(linux_vm_jumpbox_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+                  echo "windows_vm_admin_username = \"$(windows_vm_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+                  echo "windows_vm_admin_password = \"$(windows_vm_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+                  echo "psql_admin_username = \"$(psql_admin_username)\"" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+                  echo "psql_admin_password = \"$(psql_admin_password)\"" >> "$(System.DefaultWorkingDirectory)/environments/production/terraform.tfvars"
+                displayName: 'Append variables to terraform.tfvars'
+
+              - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
+                displayName: 'Install Terraform'
+                inputs:
+                  terraformVersion: 'latest'
+
+              - task: TerraformTaskV4@4
+                displayName: 'Terraform Init'
+                inputs:
+                  provider: 'azurerm'
+                  command: 'init'
+                  workingDirectory: '$(System.DefaultWorkingDirectory)/environments/production'
+                  backendServiceArm: 'sc-searateserp-prod'
+                  backendAzureRmResourceGroupName: 'rg-searates-erp-shared-uaenorth'
+                  backendAzureRmStorageAccountName: 'stsearateserptfshared'
+                  backendAzureRmContainerName: 'terraform-erp-prod-state-container'
+                  backendAzureRmKey: 'terraform.tfstate'
+
+              - task: TerraformTaskV4@4
+                displayName: 'Terraform Validate'
+                inputs:
+                  provider: 'azurerm'
+                  command: 'validate'
+                  workingDirectory: '$(System.DefaultWorkingDirectory)/environments/production'
+
+              - task: TerraformTaskV4@4
+                displayName: 'Terraform Plan'
+                inputs:
+                  provider: 'azurerm'
+                  command: 'plan'
+                  workingDirectory: '$(System.DefaultWorkingDirectory)/environments/production'
+                  commandOptions: '-out=tfplan'
+                  environmentServiceNameAzureRM: 'sc-searateserp-prod'
+
+              - task: TerraformTaskV4@4
+                displayName: 'Terraform Apply'
+                inputs:
+                  provider: 'azurerm'
+                  command: 'apply'
+                  workingDirectory: '$(System.DefaultWorkingDirectory)/environments/production'
+                  commandOptions: '-auto-approve tfplan'
+                  environmentServiceNameAzureRM: 'sc-searateserp-prod'

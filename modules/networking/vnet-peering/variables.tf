@@ -72,12 +72,4 @@ variable "use_hub_gateway" {
   default     = false
 }
 
-# ========================================
-# Local Variables
-# ========================================
-
-locals {
-  # Auto-generate peering names if not provided
-  hub_to_spoke_name = var.hub_to_spoke_peering_name != null ? var.hub_to_spoke_peering_name : "peer-${var.hub_vnet_name}-to-${var.spoke_vnet_name}"
-  spoke_to_hub_name = var.spoke_to_hub_peering_name != null ? var.spoke_to_hub_peering_name : "peer-${var.spoke_vnet_name}-to-${var.hub_vnet_name}"
-}
+# Note: Local variables moved to main.tf for better resource access

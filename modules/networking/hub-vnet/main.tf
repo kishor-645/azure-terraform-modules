@@ -1,5 +1,5 @@
 # Hub VNet Module
-# Creates hub VNet with 6 subnets for shared services architecture
+# Only 5 subnets: Firewall, Bastion, FW Management, Shared Services, Private Endpoints
 
 terraform {
   required_version = ">= 1.10.3"
@@ -50,8 +50,6 @@ resource "azurerm_subnet" "firewall" {
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.hub.name
   address_prefixes     = [var.firewall_subnet_cidr]
-
-  # Firewall subnet cannot have delegation or service endpoints
 }
 
 # 2. Azure Bastion Subnet (must be named exactly "AzureBastionSubnet")
@@ -60,8 +58,6 @@ resource "azurerm_subnet" "bastion" {
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.hub.name
   address_prefixes     = [var.bastion_subnet_cidr]
-
-  # Bastion subnet cannot have delegation
 }
 
 # 3. Azure Firewall Management Subnet (must be named exactly "AzureFirewallManagementSubnet")
@@ -79,7 +75,6 @@ resource "azurerm_subnet" "shared_services" {
   virtual_network_name = azurerm_virtual_network.hub.name
   address_prefixes     = [var.shared_services_subnet_cidr]
 
-  # Service endpoints for shared services
   service_endpoints = [
     "Microsoft.Storage",
     "Microsoft.KeyVault",
@@ -96,17 +91,4 @@ resource "azurerm_subnet" "private_endpoints" {
 
   # Disable private endpoint network policies
   private_endpoint_network_policies = "Disabled"
-}
-
-# 6. Jumpbox Subnet
-resource "azurerm_subnet" "jumpbox" {
-  name                 = var.jumpbox_subnet_name
-  resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.hub.name
-  address_prefixes     = [var.jumpbox_subnet_cidr]
-
-  service_endpoints = [
-    "Microsoft.Storage",
-    "Microsoft.KeyVault"
-  ]
 }

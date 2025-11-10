@@ -58,10 +58,7 @@ output "private_endpoints_subnet_id" {
   value       = azurerm_subnet.private_endpoints.id
 }
 
-output "jumpbox_subnet_id" {
-  description = "The ID of the jumpbox subnet"
-  value       = azurerm_subnet.jumpbox.id
-}
+# Note: Jumpbox subnet is in spoke VNet, not hub VNet
 
 # ========================================
 # Subnet Outputs - Names
@@ -75,7 +72,6 @@ output "subnet_names" {
     firewall_management = azurerm_subnet.firewall_management.name
     shared_services     = azurerm_subnet.shared_services.name
     private_endpoints   = azurerm_subnet.private_endpoints.name
-    jumpbox             = azurerm_subnet.jumpbox.name
   }
 }
 
@@ -91,7 +87,6 @@ output "subnet_address_prefixes" {
     firewall_management = azurerm_subnet.firewall_management.address_prefixes[0]
     shared_services     = azurerm_subnet.shared_services.address_prefixes[0]
     private_endpoints   = azurerm_subnet.private_endpoints.address_prefixes[0]
-    jumpbox             = azurerm_subnet.jumpbox.address_prefixes[0]
   }
 }
 
@@ -133,11 +128,6 @@ output "hub_vnet_details" {
         id             = azurerm_subnet.private_endpoints.id
         name           = azurerm_subnet.private_endpoints.name
         address_prefix = azurerm_subnet.private_endpoints.address_prefixes[0]
-      }
-      jumpbox = {
-        id             = azurerm_subnet.jumpbox.id
-        name           = azurerm_subnet.jumpbox.name
-        address_prefix = azurerm_subnet.jumpbox.address_prefixes[0]
       }
     }
   }
